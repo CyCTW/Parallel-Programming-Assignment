@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <thread>
-
+#include<iostream>
 #include "CycleTimer.h"
 
 typedef struct
@@ -22,12 +22,20 @@ extern void mandelbrotSerial(
     int maxIterations,
     int output[]);
 
+extern void mandlebrotfast(
+    float x0, float y0, float x1, float y1,
+    int width, int height,
+    int row_idx,
+    int maxIterations,
+    int output[]);
+
 //
 // workerThreadStart --
 //
 // Thread entrypoint.
 void workerThreadStart(WorkerArgs *const args)
 {
+    double startTime = CycleTimer::currentSeconds();
 
     // TODO FOR PP STUDENTS: Implement the body of the worker
     // thread here. Each thread should make a call to mandelbrotSerial()
@@ -35,7 +43,16 @@ void workerThreadStart(WorkerArgs *const args)
     // program that uses two threads, thread 0 could compute the top
     // half of the image and thread 1 could compute the bottom half.
 
-    printf("Hello world from thread %d\n", args->threadId);
+    // calculate line by line
+    auto thread_num = args->numThreads;
+
+    for(unsigned row_idx = args->threadId; row_idx < args->height; row_idx += thread_num) {
+        mandlebrotfast(args->x0, args->y0, args->x1, args->y1, args->width, args->height, row_idx, args->maxIterations, args->output);
+    }
+
+    // printf("Hello world from thread %d\n", args->threadId);
+    double endTime = CycleTimer::currentSeconds();
+    std::cout << "Thread ID: " << args->threadId << " Time cost: " << endTime - startTime << '\n';
 }
 
 //
@@ -61,6 +78,7 @@ void mandelbrotThread(
     std::thread workers[MAX_THREADS];
     WorkerArgs args[MAX_THREADS];
 
+    // 0
     for (int i = 0; i < numThreads; i++)
     {
         // TODO FOR PP STUDENTS: You may or may not wish to modify
@@ -75,7 +93,6 @@ void mandelbrotThread(
         args[i].maxIterations = maxIterations;
         args[i].numThreads = numThreads;
         args[i].output = output;
-
         args[i].threadId = i;
     }
 
@@ -95,3 +112,4 @@ void mandelbrotThread(
         workers[i].join();
     }
 }
+//158.815ms + 121.719ms
