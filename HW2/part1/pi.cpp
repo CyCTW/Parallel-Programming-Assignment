@@ -15,7 +15,7 @@ using namespace std;
 lld total_num_of_tosses;
 int thread_num;
 
-lld in_circle[40000] = { 0 };
+// lld in_circle[40000] = { 0 };
 
 int R = (1<<15)-1;
 
@@ -28,7 +28,7 @@ void* sub_func(void* arg) {
 
 	lld num_of_tosses = total_num_of_tosses / thread_num;
 	int n = *(int*)arg;
-
+	lld total = 0;
 	for(lld toss = 0; toss<num_of_tosses; toss++) {
 		// float x = dist(gen) ;
 		// float y = dist(gen) ;
@@ -42,7 +42,8 @@ void* sub_func(void* arg) {
 		// cout << dis << ' ' << R*R << '\n';
 		// if (dis <= 1) {
 		if (dis <= R*R) {
-			in_circle[n]++;
+			total++;
+			// in_circle[n]++;
 		}
 	}
 	// cout << "Thread_num: " << n << "in_circle: " << in_circle[n] << "num_of_tosses: " << num_of_tosses << '\n';
@@ -100,7 +101,6 @@ void* sub_func_SIMD(void *arg) {
 
 	lld num_of_tosses = total_num_of_tosses / thread_num;
 
-	// int n = part++;
 	int n = *(int *)arg;
 	int vec_width = 8;
 
@@ -146,9 +146,9 @@ void* sub_func_SIMD(void *arg) {
 	// 8 32-bit int in res, add them up
 	sumup(res, total);
 
-	in_circle[n] = total;
 	// cout << "Thread " << n << " sum: " << total << '\n';
-	return NULL;
+	lld *result = new lld(total);
+	pthread_exit((void *) result); 
 }
 
 int main(int argc, char** argv) {
@@ -158,14 +158,18 @@ int main(int argc, char** argv) {
 
 	// cal_counts = total_num_of_tosses % thread_num;
 
-	// total_num_of_tosses = (total_num_of_tosses / lld(thread_num*8) + 1) * thread_num*8;
+	total_num_of_tosses = (total_num_of_tosses / lld(thread_num*8) + 1) * thread_num*8;
 
 	cout << "Total num of tosses: " << total_num_of_tosses << '\n';
 
 	pthread_t pt[thread_num];
 	
-	int thread_id[thread_num+10];
+	int thread_id[thread_num];
+	void* thread_result[thread_num];
+	void* test;
+
 	memset(thread_id, 0, sizeof(thread_id));
+	memset(thread_result, 0, sizeof(thread_result));
 	for(int i=0; i<thread_num; i++) {
 		thread_id[i] = i;
 	}
@@ -175,12 +179,12 @@ int main(int argc, char** argv) {
 		pthread_create(&pt[i], NULL, sub_func_SIMD, (void*)&thread_id[i]);
 	}
 	for(int i = 0; i < thread_num; i++) {
-		pthread_join(pt[i], NULL);
+		pthread_join(pt[i], &thread_result[i]);
 	}
 	
 	lld total_in_circle = 0;
 	for(int i = 0; i < thread_num; i++) {
-		total_in_circle += in_circle[i];
+		total_in_circle += *(lld*)thread_result[i];
 	}
 
 	double pi_ = 4 * total_in_circle / (double)total_num_of_tosses ;
