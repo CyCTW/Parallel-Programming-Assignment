@@ -15,6 +15,7 @@
 // damping:     page-rank algorithm's damping parameter
 // convergence: page-rank algorithm's convergence threshold
 //
+
 void pageRank(Graph g, double *solution, double damping, double convergence)
 {
 
@@ -23,16 +24,31 @@ void pageRank(Graph g, double *solution, double damping, double convergence)
 
   int numNodes = num_nodes(g);
   double equal_prob = 1.0 / numNodes;
+  
+  #pragma omp parallel for
   for (int i = 0; i < numNodes; ++i)
   {
     solution[i] = equal_prob;
   }
+
   bool converged = false;
-  double score_new[numNodes + 1];
-  memset(score_new, 0, sizeof(score_new));
+  double *score_new = new double[numNodes];
+  memset(score_new, 0, sizeof(double) * numNodes);
 
   while ( !converged ) {
+    // iterate for all 
+
+    double vsum = 0;
+
+    #pragma omp parallel for reduction(+: vsum)
+    for ( int v = 0; v < numNodes; v++) {
+      if (outgoing_size(g, v) == 0) {
+        vsum += (damping * solution[v]) / numNodes;
+      }
+    }
     // iterate for all nodes
+    double ssum = 0;
+    #pragma omp parallel for 
     for (int i = 0; i < numNodes; i++) {
       const Vertex* start = incoming_begin(g, i);
       const Vertex* end = incoming_end(g, i);
@@ -41,28 +57,25 @@ void pageRank(Graph g, double *solution, double damping, double convergence)
       // iterate for all incoming edges of node i
       for (const Vertex* v = start; v!=end; v++) {
         // sum up old_score of v / num edges leaving v
-        nsum += solution[v] / outgoing_size(g, v);
+        nsum += solution[*v] / outgoing_size(g, *v);
       }
       score_new[i] = (damping * nsum) + (1.0 - damping) / numNodes;
-      
-      // iterate for all 
-      double vsum = 0;
-      for (const Vertex* v = 0; v!=; v++) {
-        if (outgoing_size(g, v) == 0) {
-          vsum += (damping * solution[v]) / numNodes;
-        }
-      }
       score_new[i] += (vsum);
     }
+
     double global_diff = 0;
+    
+    #pragma omp parallel for reduction (+:global_diff)
     for (int i = 0; i < numNodes; i++) {
-      global_diff += abs(score_new[vi] - solution[i]);
+      global_diff += abs(score_new[i] - solution[i]);
     }
 
     if (global_diff < convergence) {
       converged = true;
     }
+
     // update
+    #pragma omp parallel for
     for(int i = 0; i < numNodes; i++) {
       solution[i] = score_new[i];
     }
