@@ -27,7 +27,46 @@ void pageRank(Graph g, double *solution, double damping, double convergence)
   {
     solution[i] = equal_prob;
   }
+  bool converged = false;
+  double score_new[numNodes + 1];
+  memset(score_new, 0, sizeof(score_new));
 
+  while ( !converged ) {
+    // iterate for all nodes
+    for (int i = 0; i < numNodes; i++) {
+      const Vertex* start = incoming_begin(g, i);
+      const Vertex* end = incoming_end(g, i);
+      
+      double nsum = 0;
+      // iterate for all incoming edges of node i
+      for (const Vertex* v = start; v!=end; v++) {
+        // sum up old_score of v / num edges leaving v
+        nsum += solution[v] / outgoing_size(g, v);
+      }
+      score_new[i] = (damping * nsum) + (1.0 - damping) / numNodes;
+      
+      // iterate for all 
+      double vsum = 0;
+      for (const Vertex* v = 0; v!=; v++) {
+        if (outgoing_size(g, v) == 0) {
+          vsum += (damping * solution[v]) / numNodes;
+        }
+      }
+      score_new[i] += (vsum);
+    }
+    double global_diff = 0;
+    for (int i = 0; i < numNodes; i++) {
+      global_diff += abs(score_new[vi] - solution[i]);
+    }
+
+    if (global_diff < convergence) {
+      converged = true;
+    }
+    // update
+    for(int i = 0; i < numNodes; i++) {
+      solution[i] = score_new[i];
+    }
+  }
   /*
      For PP students: Implement the page rank algorithm here.  You
      are expected to parallelize the algorithm using openMP.  Your
@@ -56,4 +95,5 @@ void pageRank(Graph g, double *solution, double damping, double convergence)
      }
 
    */
+
 }
