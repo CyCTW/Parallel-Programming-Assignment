@@ -4,6 +4,34 @@
 #include <time.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <random>
+
+typedef long long lld;
+
+unsigned R = (1<<15)-1; // 0x7FFF
+
+int xorshift(int &state) {
+	int x = state;
+	x ^= (x << 13);
+	x ^= (x >> 17);
+	x ^= (x << 5);
+	return state = x;
+}
+
+lld count_toss(lld iterations) {
+	std::random_device rd;
+	lld toss;
+	lld count = 0;
+
+	int rdn = rd();
+	for(toss = 0; toss < iterations; toss++) {
+		unsigned xy = xorshift( rdn );
+		unsigned x = (xy & 0x7FFF0000) >> 16;
+		unsigned y = xy & 0x00007FFF;
+		count += ( (x*x + y*y) <= R*R);
+	}
+	return count;
+}
 
 int main(int argc, char **argv)
 {
@@ -16,19 +44,39 @@ int main(int argc, char **argv)
     // ---
 
     // TODO: init MPI
+	MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+	MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+	
+	lld iterations = tosses / world_size;
+	lld total_count, count = 0;
+
+	int tag = 0;
 
     if (world_rank > 0)
     {
         // TODO: handle workers
+		count = count_toss( iterations );
+		// send message to 0
+		int dest_rank = 0;
+		MPI_Send(&count, 1, MPI_LONG_LONG, dest_rank, tag, MPI_COMM_WORLD);
     }
     else if (world_rank == 0)
     {
         // TODO: master
+		total_count = count_toss( iterations );
+		int rank;
+		lld src_count;
+		for(rank = 1; rank < world_size; rank++) {
+			MPI_Recv(&src_count, 1, MPI_LONG_LONG, rank, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+			// printf("Rank: %d, SRC count: %lld \n", rank, src_count);
+			total_count += src_count;
+		}
     }
 
     if (world_rank == 0)
     {
         // TODO: process PI result
+		pi_result = 4 * total_count / (double) tosses;
 
         // --- DON'T TOUCH ---
         double end_time = MPI_Wtime();
