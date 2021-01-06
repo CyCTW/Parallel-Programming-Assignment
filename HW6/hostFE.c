@@ -31,9 +31,11 @@ void hostFE(int filterWidth, float *filter, int imageHeight, int imageWidth,
     clSetKernelArg(kernel, 3, sizeof(int), &imageWidth);
     clSetKernelArg(kernel, 4, sizeof(int), &imageHeight);
     clSetKernelArg(kernel, 5, sizeof(int), &filterWidth);
+    int block_size = 10;
+    clSetKernelArg(kernel, 6, sizeof(int), &block_size);
 
     // set group sizes
-    size_t local_work_size[2] = {8, 8};
+    size_t local_work_size[2] = {block_size, block_size};
     size_t global_work_size[2] = {imageWidth, imageHeight};
 
     clEnqueueNDRangeKernel(command_queue, kernel, 2, 0, global_work_size, local_work_size, 0, NULL, NULL);
