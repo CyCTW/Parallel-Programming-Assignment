@@ -71,7 +71,7 @@ int main(int argc, char **argv)
 	count = count_toss( iterations );
 	while(bitmsk < times ) {
 		int mask = ( 1 << bitmsk );
-		printf("rank: %d ", world_rank);
+		// printf("rank: %d ", world_rank);
 
 		// 1: send, 0: recv
 		if (world_rank & mask) {
@@ -91,7 +91,7 @@ int main(int argc, char **argv)
 		}
 		bitmsk++;
 	}
-	printf("Send times: %d\n", send);	
+	// printf("Send times: %d\n", send);	
 
     if (world_rank == 0)
     {

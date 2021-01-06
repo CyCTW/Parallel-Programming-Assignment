@@ -60,6 +60,9 @@ int main(int argc, char **argv)
         // Master
 		lld *count_arr;
 		MPI_Alloc_mem(world_size * sizeof(lld), MPI_INFO_NULL, &count_arr);
+		for(lld i=0; i<world_size; i++) {
+			count_arr[i] = 0;
+		}
 
 		lld count = count_toss( iterations );
 		
@@ -67,23 +70,33 @@ int main(int argc, char **argv)
 		lld ready = 0;
 		int i;
 		int cnt = 0;
-		while (ready == 0)
+		bool judge = false;
+		while (!judge)
 		{
-			ready = 1;
+			judge = true;
 			MPI_Win_lock(MPI_LOCK_SHARED, 0, 0, win);
 			
-			for(i = 1; (i < world_size) && (ready==0); i++) {
+			for(i = 1; (i < world_size); i++) {
 				ready = count_arr[ i ];
+				if (ready == 0)  {
+					judge = false;
+					break;
+				}
 			}
 
 			MPI_Win_unlock(0, win);
 		}
-		printf("All nodes finished\n");
+		
+		// printf("All nodes finished\n");
 		total_count = count;
+		// printf("count: %lld\n", count);
 		
 		for(i = 1; i < world_size; i++) {
+			// printf("count: %lld\n", count_arr[i]);
 			total_count += count_arr[ i ];
 		}
+	    MPI_Win_free(&win);
+
     }
     else
     {
@@ -96,10 +109,12 @@ int main(int argc, char **argv)
 		MPI_Win_lock(MPI_LOCK_EXCLUSIVE, 0, 0, win);
 		MPI_Put(&count, 1, MPI_LONG_LONG, 0, world_rank, 1, MPI_LONG_LONG, win);
 		MPI_Win_unlock(0, win);
-		printf("Rank %d Finished\n", world_rank);
+
+	    MPI_Win_free(&win);
+
+		// printf("Rank %d Finished\n", world_rank);
     }
 
-    MPI_Win_free(&win);
 
     if (world_rank == 0)
     {
