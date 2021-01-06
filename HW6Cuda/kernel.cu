@@ -5,37 +5,68 @@
 __global__ void convKernel(float* output, float* inputImage, float* filter, int imageWidth, int imageHeight, int filterWidth) {
     
 
-    // __shared__ float sharedFilter[filterWidth][filterWidth];
-    
     // this array shift right and shift down "half filter size" pixel
-    // __shared__ float sharedInput[ 16*16 ];
-    
-    // int col = threadIdx.x, row = threadIdx.y;
-    // int maxWidth = 10+6;
-    // int idx = (row * maxWidth + col )*3;
+    int half_filter_size = filterWidth / 2;
+    int block_size = 8;
+    const int bound = block_size + half_filter_size*2;
 
+    __shared__ float sharedInput[ 20 * 20 ];
+    __shared__ int x1;
+    __shared__ int y1;
+
+    
+
+    int col = threadIdx.x, row = threadIdx.y;
+    // idx: 0~300
+    int idx = (row * block_size + col ) * 4;
     int rowidx = blockIdx.y * blockDim.y + threadIdx.y;
     int colidx = blockIdx.x * blockDim.x + threadIdx.x;
 
-    float sum = 0;
-    int half_filter_size = filterWidth / 2;
-    // int imageSize = imageHeight * imageWidth;
-    // int sidx = (rowidx - half_filter_size) * imageWidth + colidx - half_filter_size + idx;
-    // if (sidx >= 0 && sidx < imageSize)
-    //     sharedInput[ idx ] = inputImage[ sidx ];
-    // if (sidx + 1 >= 0 && sidx+1 < imageSize)
-    //     sharedInput[ idx+1 ] = inputImage[ sidx+1 ];
-    // if (sidx + 2 >= 0 && sidx+2 < imageSize)
-    //     sharedInput[ idx+2 ] = inputImage[ sidx+2 ];
-    
-    // if ( row <  filterWidth ) {
-    //     sharedInput[row + 8][col] = inputImage[ (rowidx + 8) * imageWidth + colidx ];
-    // }
-    // if ( col < filterWidth) {
-    //     sharedInput[row][col + 8] = inputImage[ (rowidx) * imageWidth + colidx + 8];
-    // }
+    // first element store head position
+    if (row == 0 && col == 0) {
+        x1 = rowidx - half_filter_size;
+        y1 = colidx - half_filter_size;
+    }
+    __syncthreads();
 
-    // __syncthreads();
+    float sum = 0;
+    // int imageSize = imageHeight * imageWidth;
+
+    // store image to local 
+    int r = x1 + ( idx / bound);
+    int c = y1 + ( idx % bound);
+    if ( r >=0 && r < imageHeight && c >= 0 && c < imageWidth )
+        sharedInput[ idx   ] = inputImage[ (r) * imageWidth + (c)     ];
+
+    r = x1 + ( (idx+1) / bound);
+    c = y1 + ( (idx+1) % bound);
+    if ( r >=0 && r < imageHeight && c >= 0 && c < imageWidth )
+        sharedInput[ idx+1 ] = inputImage[ (r) * imageWidth + (c)  ];
+
+    r = x1 + ( (idx+2) / bound);
+    c = y1 + ( (idx+2) % bound);
+    if ( r >=0 && r < imageHeight && c >= 0 && c < imageWidth )
+        sharedInput[ idx+2 ] = inputImage[ (r) * imageWidth + (c)  ];
+    r = x1 + ( (idx+3) / bound);
+    c = y1 + ( (idx+3) % bound);
+    if ( r >=0 && r < imageHeight && c >= 0 && c < imageWidth )
+        sharedInput[ idx+3 ] = inputImage[ (r) * imageWidth + (c)  ];
+
+    // if (row == 0 && col == 0) {
+    //     // load image
+    //     for(int i=0; i<bound; i++) {
+    //         for(int j=0; j<bound; j++) {
+    //             int r = rowidx - half_filter_size + i;
+    //             int c = colidx - half_filter_size + j;
+    //             if ( r >=0 && r < imageHeight && c >= 0 && c < imageWidth ) {
+    //                 sharedInput[i * bound + j] = inputImage[ (r) * imageWidth + (c) ];
+    //             }
+    //         }
+    //     }
+    // }
+    __syncthreads();
+
+    
 
     for (int k = -half_filter_size,  fi = 0; k<=half_filter_size; k++) {
 
@@ -44,15 +75,16 @@ __global__ void convKernel(float* output, float* inputImage, float* filter, int 
             if ( rowidx + k >= 0 && rowidx + k < imageHeight &&
                  colidx + l >= 0 && colidx + l < imageWidth ) 
             {
-                sum += inputImage[ (rowidx + k) * imageWidth + colidx + l ] * filter[fi];
-                // sum += sharedInput[ k + half_filter_size + row][ l + half_filter_size + col] * filter[fi];
-                // int xidx = (k + half_filter_size + row) * 16 + l + half_filter_size + col;
-                // sum += sharedInput[ xidx ] * filter[fi];
+
+
+                int xx = k + half_filter_size + row;
+                int yy = l + half_filter_size + col;
+                sum += sharedInput[ xx * bound +  yy ] * filter[fi];
 
             }
         }
     }
-    // __syncthreads();
+    __syncthreads();
 
     output[ rowidx * imageWidth + colidx] = sum;
 
@@ -75,7 +107,7 @@ void hostFE(int filterWidth, float *filter, int imageHeight, int imageWidth,
     cudaMemcpy(cuda_filter, filter, filterWidth * filterWidth * sizeof(float) , cudaMemcpyHostToDevice);
     cudaMemcpy(cuda_input, inputImage, resX * resY * sizeof(float) , cudaMemcpyHostToDevice);
 
-    int block_size_x = 10;
+    int block_size_x = 8;
 
     dim3 blocksize(block_size_x, block_size_x);
 	dim3 gridsize(resX / block_size_x, resY / block_size_x) ;
