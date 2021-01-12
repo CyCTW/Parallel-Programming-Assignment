@@ -5,68 +5,69 @@ __kernel void convolution(
     int imageWidth,
     int imageHeight,
     int filterWidth,
-    int block_size
+    int block_width
 ) 
 {
-    int half_filter_size = filterWidth / 2;
-    // int block_size = 8;
-    const int bound = block_size + half_filter_size*2;
-
-    __local float sharedInput[ 20 * 20 ];
-    __local int x1;
-    __local int y1;
-
-    int col = get_local_id(0), row = get_local_id(1);
-    // idx: 0~300
-    int idx = (row * block_size + col ) * 3;
-
     int rowidx = get_global_id(1);
     int colidx = get_global_id(0);
-    
-    if (row == 0 && col == 0) {
-        x1 = rowidx - half_filter_size;
-        y1 = colidx - half_filter_size;
+
+    if (rowidx >= imageHeight || colidx >= imageWidth ) {
+        return;
     }
-    barrier(CLK_LOCAL_MEM_FENCE);
+    int hfs = filterWidth / 2;
 
-    // store image to local 
-    int r = x1 + ( idx / bound);
-    int c = y1 + ( idx % bound);
-    if ( r >=0 && r < imageHeight && c >= 0 && c < imageWidth )
-        sharedInput[ idx   ] = inputImage[ (r) * imageWidth + (c)     ];
+    __local float sharedInput[ 30][ 30 ];
+    // __local int x1;
+    // __local int y1;
 
-    r = x1 + ( (idx+1) / bound);
-    c = y1 + ( (idx+1) % bound);
-    if ( r >=0 && r < imageHeight && c >= 0 && c < imageWidth )
-        sharedInput[ idx+1 ] = inputImage[ (r) * imageWidth + (c)  ];
+    int col = get_local_id(0), row = get_local_id(1);
+    sharedInput[row + hfs][col + hfs] = inputImage[ rowidx * imageWidth + colidx];
 
-    r = x1 + ( (idx+2) / bound);
-    c = y1 + ( (idx+2) % bound);
-    if ( r >=0 && r < imageHeight && c >= 0 && c < imageWidth )
-        sharedInput[ idx+2 ] = inputImage[ (r) * imageWidth + (c)  ];
+    // // four edge & corner
+    if (row < hfs && (rowidx - hfs) >= 0) {
+        sharedInput[row][col + hfs] = inputImage[ (rowidx - hfs)*imageWidth + (colidx) ];
 
-    // r = x1 + ( (idx+3) / bound);
-    // c = y1 + ( (idx+3) % bound);
-    // if ( r >=0 && r < imageHeight && c >= 0 && c < imageWidth )
-    //     sharedInput[ idx+3 ] = inputImage[ (r) * imageWidth + (c)  ];
+        if (col < hfs && (colidx-hfs) >= 0) {
+            sharedInput[row][col] = inputImage[ (rowidx - hfs)*imageWidth + (colidx - hfs) ];
+        }
+        else if (col >= (block_width - hfs) && (colidx + hfs) < imageWidth ) {
+            sharedInput[row][col + (2 * hfs)] = inputImage[ (rowidx - hfs)*imageWidth + (colidx + hfs) ];
+        }
+    }
+    if (col < hfs && (colidx-hfs) >= 0) {
+        sharedInput[row + hfs][col] = inputImage[ (rowidx)*imageWidth + (colidx - hfs) ];
+    }
+    if (row >= (block_width - hfs) && (rowidx + hfs) < imageHeight) {
+        sharedInput[row + (2*hfs)][col + hfs] = inputImage[ (rowidx + hfs)*imageWidth + (colidx) ];
+        
+        if (col < hfs && (colidx-hfs) >= 0) {
+            sharedInput[row + (2*hfs)][ col ] = inputImage[ (rowidx + hfs)*imageWidth + (colidx - hfs) ];
+        }else if (col >= block_width - hfs && (colidx + hfs) < imageWidth) {
+            sharedInput[row + (2*hfs)][ col + (2*hfs) ] = inputImage[ (rowidx + hfs)*imageWidth + (colidx + hfs) ];
+        }
+    }
+    if (col >= (block_width - hfs) && (colidx + hfs) < imageWidth) {
+        sharedInput[row + hfs][col + (2*hfs)] = inputImage[ (rowidx)*imageWidth + (colidx + hfs) ];
+    }
 
-    barrier(CLK_LOCAL_MEM_FENCE);
+    const int bound = block_width + hfs*2;
+
 
     float sum = 0;
 
-    for (int k = -half_filter_size,  fi = 0; k<=half_filter_size; k++) {
-        for(int l = -half_filter_size; l<=half_filter_size; fi++, l++) {
+    for (int k = -hfs,  fi = 0; k<=hfs; k++) {
+        for(int l = -hfs; l<=hfs; fi++, l++) {
 
             if ( rowidx + k >= 0 && rowidx + k < imageHeight &&
                  colidx + l >= 0 && colidx + l < imageWidth ) 
             {
-                int xx = k + half_filter_size + row;
-                int yy = l + half_filter_size + col;
-                sum += sharedInput[ xx * bound +  yy ] * filter[fi];
+                int xx = k + hfs + row;
+                int yy = l + hfs + col;
+                // sum += sharedInput[ xx * bound +  yy ] * filter[fi];
+                sum += sharedInput[xx][yy] * filter[fi];
             }
         }
     }
-    barrier(CLK_LOCAL_MEM_FENCE);
 
     outputImage[ rowidx * imageWidth + colidx] = sum;
 }
