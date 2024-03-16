@@ -1,4 +1,4 @@
-# HW1
+# HW1: SIMD Programming
 
 ## Requirements:
 - Please see the [PDF](./Programming%20Assignment%20I.pdf)

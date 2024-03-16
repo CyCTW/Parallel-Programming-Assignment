@@ -1,6 +1,6 @@
-# HW1
+# HW5: CUDA Programming
 
-## Requirements:
+## Requirements
 - Please see the [PDF](./Programming%20Assignment%20V.pdf)
 
 ## Reports

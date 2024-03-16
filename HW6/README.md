@@ -1,4 +1,4 @@
-# HW1
+# HW6: OpenCL Programming
 
 ## Requirements:
 - Please see the [PDF](./Programming%20Assignment%20VI.pdf)

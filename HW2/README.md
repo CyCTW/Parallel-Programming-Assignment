@@ -1,6 +1,6 @@
-# HW1
+# HW2: Multi-threaded Programming
 
-## Requirements:
+## Requirements
 - Please see the [PDF](./Programming%20Assignment%20II.pdf)
 
 ## Reports

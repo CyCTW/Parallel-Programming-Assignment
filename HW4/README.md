@@ -1,4 +1,4 @@
-# HW1
+# HW4: MPI Programming
 
 ## Requirements:
 - Please see the [PDF](./Programming%20Assignment%20IV.pdf)
